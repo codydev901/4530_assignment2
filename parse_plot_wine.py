@@ -1,33 +1,47 @@
 import pandas as pd
 
-import plotly.express as px
+import plotly.graph_objs as go
 
 """
-Doc Doc Doc
+Cody Whitt
+pkz325
+CPSC 4530 Spring 2023
+Assignment 2
+
+For Dataset 3 - 6 Dimensions (technically did 7, 6 continuous quantitative and 1 ordinal)
+
+parse and plot steps separated into separate functions.
 """
 
 
 def get_quality_grade(raw_quality: int):
+    """
+    Helper function for reducing range of possible values for quality attribute
+    """
 
     if raw_quality <= 4:  # 3, 4
-        return 1
+        return 0.0
 
     if raw_quality <= 6:  # 5, 6
-        return 2
+        return 0.5
 
-    return 3         # 7, 8
+    return 1.0         # 7, 8
 
 
 def parse_data():
+    """
+    Parsing portion of the wine quality data set.
+
+    Writes to parsed_data.
+    """
 
     # CSV to Dataframe, basic check
     raw_df = pd.read_csv("raw_data/winequality-red.csv")
     print(raw_df.head())
     print(raw_df.info())
 
-    # So no nulls, 12 attributes. We want quality + 5 others
-    # Lets pick the 5 w/ the most potential variation
-    # May or may not use this!
+    # So no nulls, 12 attributes. We want quality + 6 others
+    # Lets pick the 6 w/ the observed variation by comparing the coefficient of variation for each attribute
     abs_attr_diff = []
     for attr in raw_df.columns:
         sub_df = raw_df[attr]
@@ -37,73 +51,106 @@ def parse_data():
     for v in abs_attr_diff:
         print(v)
 
-    # Change quality to a pure categorical string
-    raw_df["quality_grade"] = raw_df["quality"].apply(lambda x: get_quality_grade(x))
+    keep_attributes = [v[0] for v in abs_attr_diff[:6]] + ["quality"]
+    print("Keep Attributes - We Want 6 + Quality")
+    print(keep_attributes)
 
-    # Now need to normalize, lets use Min-Max
-    # Also setup new DataFrame for eventual plotting
-    parsed_df = {}
-    for attr in raw_df.columns:
-        if attr in ["quality", "quality_grade"]:
-            parsed_df[attr] = raw_df[attr].tolist()
-            continue
+    # Remove the unused attributes
+    raw_df = raw_df[keep_attributes]
+    print(raw_df.info())
 
-        sub_df = raw_df[attr]
-        min_v = sub_df.min()
-        max_v = sub_df.max()
-        norm_v = [(v-min_v) / (max_v - min_v) for v in sub_df.tolist()]
-        parsed_df[attr] = norm_v
+    # Bucket quality to 3 grades from 6, where 1 is low, 2 is medium, 3 is high
+    print("Bucket Quality From 6 to 3 Levels")
+    print(raw_df.head())
+    print(raw_df.tail())
+    raw_df["quality"] = raw_df["quality"].apply(lambda x: get_quality_grade(x))
+    print(raw_df.head())
+    print(raw_df.tail())
 
-    parsed_df = pd.DataFrame(parsed_df)
-
-    # Check our new DF
-    print(parsed_df.head())
-    for attr in parsed_df.columns:
-        if attr in ["quality_grade"]:
-            continue
-        sub_df = parsed_df[attr]
-        cf_var_v = sub_df.std() / sub_df.mean()
-        print(attr, cf_var_v, sub_df.min(), sub_df.max())
-
-    # Do one more transformation for easier plotting
-    final_df = [["wine_id", "attr_key", "attr_value", "quality_grade"]]
-    for i, row in parsed_df.iterrows():
-        for attr_key in parsed_df.columns:
-            if attr_key in ["quality", "quality_grade"]:  # This is inefficient, but small size
-                continue
-            final_df.append([i, attr_key, row[attr_key], row["quality_grade"]])
+    # Reduce Complexity Further By Taking Median Values For Each Quality Level
+    final_df = [raw_df.columns.tolist()]
+    for quality in raw_df["quality"].unique().tolist():
+        sub_df = raw_df[raw_df["quality"] == quality]
+        quality_row = []
+        for attr in raw_df.columns.tolist():
+            median_value = sub_df[attr].median()
+            quality_row.append(median_value)
+        final_df.append(quality_row)
 
     final_df = pd.DataFrame(data=final_df[1:], columns=final_df[0])
     print(final_df.head())
 
-    # return parsed_df
-    return final_df
+    # But let's also preserve the original full ranges for use in the plot
+    range_df = [["attr_key", "attr_min", "attr_max"]]
+    for attr in raw_df.columns:
+        sub_df = raw_df[attr]
+        min_v = sub_df.min()
+        max_v = sub_df.max()
+        range_df.append([attr, min_v, max_v])
+
+    range_df = pd.DataFrame(data=range_df[1:], columns=range_df[0])
+    print(range_df.head())
+
+    # Write for use in plots
+    final_df.to_csv("parsed_data/wine_quality_median_values.csv", index=False)
+    range_df.to_csv("parsed_data/wine_quality_original_range.csv", index=False)
 
 
 def plot_data():
+    """
+    Plotting portion for the wine quality dataset
 
-    df = parse_data()
+    https://plotly.com/python/parallel-coordinates-plot/
+    """
 
-    dims = df.columns.tolist()
-    dims.remove("quality_grade")
-    # dims.remove("quality")
+    value_df = pd.read_csv("parsed_data/wine_quality_median_values.csv")
+    range_df = pd.read_csv("parsed_data/wine_quality_original_range.csv")
 
-    # fig = px.parallel_coordinates(data_frame=df,
-    #                               color="quality_grade",
-    #                               dimensions=dims,
-    #                               color_continuous_scale=px.colors.diverging.Tealrose,
-    #                               color_continuous_midpoint=2
-    #                               )
+    # Put range_df into a dict for easy access below
+    range_dict = {}
+    for i, row in range_df.iterrows():
+        range_dict[row["attr_key"]] = [row["attr_min"], row["attr_max"]]
 
-    # fig.show()
+    # Plot rather manually w/ go.Figure, this avoids a continuous color_scale display w/ express.
+    fig = go.Figure(data=
+                    go.Parcoords(
+                        line=dict(color=value_df["quality"],
+                                  colorscale=[[0.0, 'red'], [0.5, 'yellow'], [1.0, 'green']]),
+                        dimensions=list([
+                            dict(range=[range_dict['citric acid'][0], range_dict['citric acid'][1]],
+                                 label='citric acid', values=value_df['citric acid']),
+                            dict(range=[range_dict['total sulfur dioxide'][0], range_dict['total sulfur dioxide'][1]],
+                                 label='total sulfur dioxide', values=value_df['total sulfur dioxide']),
+                            dict(range=[range_dict['free sulfur dioxide'][0], range_dict['free sulfur dioxide'][1]],
+                                 label='free sulfur dioxide', values=value_df['free sulfur dioxide']),
+                            dict(range=[range_dict['residual sugar'][0], range_dict['residual sugar'][1]],
+                                 label='residual sugar', values=value_df['residual sugar']),
+                            dict(range=[range_dict['chlorides'][0], range_dict['chlorides'][1]],
+                                 label='chlorides', values=value_df['chlorides']),
+                            dict(range=[range_dict['volatile acidity'][0], range_dict['volatile acidity'][1]],
+                                 label='volatile acidity', values=value_df['volatile acidity'])
+                        ])
+                    ))
 
-    fig = px.scatter(data_frame=df, x="attr_key", y="attr_value", color="quality_grade")
+    # Set Title and add a Color/Quality Annotation
+    fig.update_layout(title="Median Physicochemical Property Values and Quality For Red Wine")
+    fig.add_annotation(
+        text='Color: Green indicates high quality, Yellow medium quality, and Red low quality',
+        align='left',
+        showarrow=False,
+        xref='paper',
+        yref='paper',
+        x=1.01,
+        y=1.07,
+        bordercolor='black',
+        borderwidth=1)
+
     fig.show()
 
 
 def main():
 
-    # parse_data()
+    parse_data()
 
     plot_data()
 

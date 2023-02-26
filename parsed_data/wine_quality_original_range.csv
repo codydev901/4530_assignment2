@@ -1,0 +1,8 @@
+attr_key,attr_min,attr_max
+citric acid,0.0,1.0
+total sulfur dioxide,6.0,289.0
+free sulfur dioxide,1.0,72.0
+residual sugar,0.9,15.5
+chlorides,0.012,0.611
+volatile acidity,0.12,1.58
+quality,0.0,1.0
