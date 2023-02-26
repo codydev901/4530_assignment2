@@ -41,6 +41,7 @@ def parse_data():
     print(raw_df.info())
 
     # DropNA (~200 of 2938 points)
+    print("Drop NA")
     raw_df = raw_df.dropna()
     print(raw_df.info())
 
@@ -50,6 +51,9 @@ def parse_data():
                                     "Schooling": "years_education"})
     print("OK")
     print(raw_df.info())
+
+    print("Unique Countries")
+    print(len(raw_df["country"].unique()))
 
     # Map country to continent
     # Doing this iteratively since might needed to fix things in the lookup (The former Yugoslav republic of Macedonia)

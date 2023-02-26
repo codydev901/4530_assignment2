@@ -67,6 +67,9 @@ def parse_data():
     print(raw_df.head())
     print(raw_df.tail())
 
+    # Write this to .csv for PCA stuff
+    raw_df.to_csv("parsed_data/wine_pca.csv", index=False)
+
     # Reduce Complexity Further By Taking Median Values For Each Quality Level
     final_df = [raw_df.columns.tolist()]
     for quality in raw_df["quality"].unique().tolist():
