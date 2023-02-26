@@ -3,7 +3,14 @@ import pandas as pd
 import plotly.express as px
 
 """
-Doc Doc Doc
+Cody Whitt
+pkz325
+CPSC 4530 Spring 2023
+Assignment 2
+
+For Dataset 2 - 5 Dimensions
+
+parse and plot steps separated into separate functions.
 """
 
 
